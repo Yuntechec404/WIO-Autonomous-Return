@@ -1,0 +1,27 @@
+<launch>
+
+  <arg name="rate"                default="10" />
+  <arg name="return_rate"         default="20" />
+  <arg name="k_linear"            default="1.1" />
+  <arg name="k_angular"           default="2.0" />
+  <arg name="rviz"                default="true" />
+
+  <node pkg="robot_localization" type="ukf_localization_node" name="ukf_se" clear_params="true">
+    <rosparam command="load" file="$(find wio_autonomous_return)/params/ukf.yaml" />
+
+      <!-- <remap from="odometry/filtered" to=""/>
+      <remap from="accel/filtered" to=""/> -->
+
+  <node pkg="wio_autonomous_return" type="differential_mode.py" name="differential_mode" output="screen">
+    <param name="rate"          type="int"      value="$(arg rate)"/>
+  </node>
+
+  <node pkg="wio_autonomous_return" type="wio_return.py" name="autonomous_return" output="screen">
+    <param name="rate"          type="int"      value="$(arg return_rate)"/>
+    <param name="k_linear"      type="double"   value="$(arg k_linear)"/>
+    <param name="k_angular"     type="double"   value="$(arg k_angular)"/>
+  </node>
+
+  <node if="$(arg rviz)" name="rviz" pkg="rviz" type="rviz" args="-d $(find wio_autonomous_return)/params/display.rviz" />
+
+</launch>
