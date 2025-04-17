@@ -2,35 +2,35 @@
 
   <arg name="rate"                default="10" />
   <arg name="return_rate"         default="20" />
-  <arg name="k_linear"            default="1.1" />
-  <arg name="k_angular"           default="2.0" />
+  <arg name="kp_linear"            default="1.1" />
+  <arg name="kp_angular"           default="2.0" />
   <arg name="rviz"                default="true" />
 
   <!-- imu calibration -->
-  <node pkg="imu_filter_madgwick" type="imu_filter_node" name="imu_filter_madgwick" output="screen" respawn="false">
-    <param name="fixed_frame"               value="base_footprint"/>
+  <!-- <node pkg="imu_filter_madgwick" type="imu_filter_node" name="imu_filter_madgwick" output="screen" respawn="false">
+    <remap from="imu/data_raw"              to = "imu/data_raw"/>
+    <remap from="imu/mag"                   to = "imu/mag"/>
+
+    <param name="fixed_frame"               value="base_link"/>
+    <param name="publish_tf"                value="true"/>
     <param name="use_mag"                   value="true"/>
-    <param name="publish_tf"                value="false"/>
-    <param name="use_magnetic_field_msg"    value="false"/>
+    <param name="use_magnetic_field_msg"    value="true"/>
     <param name="world_frame"               value="enu"/>
-    <param name="orientation_stddev"        value="0.05"/>
+    <param name="orientation_stddev"        value="0.0"/>
     <param name="angular_scale"             value="1.0"/>
-  </node>
+    <param name="remove_gravity_vector"     value="false"/>
+  </node> -->
 
   <node pkg="robot_localization" type="ukf_localization_node" name="ukf_se" clear_params="true">
-    <rosparam command="load" file="$(find wio_autonomous_return)/params/ukf.yaml" />
+    <rosparam command="load" file="$(find wio_autonomous_return)/params/ukf_ngimu.yaml" />
 
       <!-- <remap from="odometry/filtered" to=""/>
       <remap from="accel/filtered" to=""/> -->
+      
+  </node>
 
   <node pkg="wio_autonomous_return" type="differential_mode.py" name="differential_mode" output="screen">
     <param name="rate"          type="int"      value="$(arg rate)"/>
-  </node>
-
-  <node pkg="wio_autonomous_return" type="wio_return.py" name="autonomous_return" output="screen">
-    <param name="rate"          type="int"      value="$(arg return_rate)"/>
-    <param name="k_linear"      type="double"   value="$(arg k_linear)"/>
-    <param name="k_angular"     type="double"   value="$(arg k_angular)"/>
   </node>
 
   <node if="$(arg rviz)" name="rviz" pkg="rviz" type="rviz" args="-d $(find wio_autonomous_return)/params/display.rviz" />

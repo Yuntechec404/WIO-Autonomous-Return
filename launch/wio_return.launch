@@ -1,0 +1,13 @@
+<launch>
+
+  <arg name="return_rate"         default="20" />
+  <arg name="kp_linear"            default="1.1" />
+  <arg name="kp_angular"           default="2.0" />
+
+  <node pkg="wio_autonomous_return" type="wio_return.py" name="autonomous_return" output="screen">
+    <param name="rate"          type="int"      value="$(arg return_rate)"/>
+    <param name="kp_linear"      type="double"   value="$(arg kp_linear)"/>
+    <param name="kp_angular"     type="double"   value="$(arg kp_angular)"/>
+  </node>
+
+</launch>

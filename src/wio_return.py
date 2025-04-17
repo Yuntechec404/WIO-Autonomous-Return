@@ -26,6 +26,8 @@ class PoseRecorderAndReturn:
         # PID 參數
         self.kp_linear = rospy.get_param("~kp_linear", 1.0)     # 5.0
         self.kp_angular = rospy.get_param("~kp_angular", 1.0)   # 0.76
+        rospy.logwarn(f"Rate: {self.r}")
+        rospy.logwarn(f"Linear: {self.kp_linear}\tAngular: {self.kp_angular}")
         
         
         # 訂閱 Odometry 用於記錄 poses
@@ -150,7 +152,7 @@ class PoseRecorderAndReturn:
         
         for i in range(len(reversed_poses) - 1):
             target_pose = reversed_poses[i + 1]
-            self.move_to_point(target_pose, self.rate)
+            self.move_to_point(target_pose)
             rospy.loginfo(f"Moved to: {target_pose}")
         
         cmd = Twist()
