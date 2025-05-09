@@ -12,6 +12,7 @@ class PoseRecorderAndReturn:
         self.is_recording = True
         # 儲存位姿的陣列
         self.poses = []
+        self.motion_mode = "Stop"
         # 當前位姿（用於閉環控制回饋）
         self.current_pose = None
         self.last_recorded_pose = None
@@ -30,8 +31,9 @@ class PoseRecorderAndReturn:
         rospy.logwarn(f"Linear: {self.kp_linear}\tAngular: {self.kp_angular}")
         
         
-        # 訂閱 Odometry 用於記錄 poses
+        # 訂閱 Odometry 用於記錄 poses, 訂閱 Twist 用於紀錄運動模式
         rospy.Subscriber('/odometry/differential_mode', Odometry, self.odometry_callback)
+        rospy.Subscriber('/cmd_vel', Twist, self.chatter_callback)
         
         # 訂閱 Odometry 用於更新當前位姿
         rospy.Subscriber('/odometry/differential_mode', Odometry, self.update_current_pose)
@@ -65,10 +67,19 @@ class PoseRecorderAndReturn:
             angle_diff = abs(yaw - last_yaw)
 
             if distance > 0.1 or angle_diff > 0.01:
-                self.poses.append(current_pose)
+                self.poses.append((current_pose, self.motion_mode)) # 多增加紀錄運動模式
                 self.last_recorded_pose = current_pose
-                rospy.loginfo(f"Recorded pose: {current_pose}")
-    
+                rospy.loginfo(f"Recorded pose: {current_pose, self.motion_mode}")
+
+    def chatter_callback(self, msg):
+        if msg.linear.x != 0: # 斜前斜後當成直線行駛
+            self.motion_mode = "Straight"
+        elif msg.linear.x == 0 and msg.angular.z != 0:
+            self.motion_mode = "Rotated"
+        else:
+            self.motion_mode = "Stop"
+
+
     def update_current_pose(self, msg):
         # 更新當前位姿用於閉環控制
         x = msg.pose.pose.position.x
@@ -80,7 +91,8 @@ class PoseRecorderAndReturn:
     
     def adjust_yaw(self, target_q):
         cmd = Twist()
-        tolerance = 0.02  # 角度容忍度（弧度，約 1.15 度）
+        # 角度容忍度（弧度，約 0.01745 -> 1 度） 0.02 -> 1.15 deg
+        tolerance = 0.01745
         max_iterations = 1000  # 最大迭代次數，防止無限迴圈
         iteration = 0
 
@@ -115,45 +127,47 @@ class PoseRecorderAndReturn:
         self.pub.publish(cmd)
         rospy.loginfo("已達到目標 yaw 角度")
     
-    def move_to_point(self, target_pose):
+    def move_to_point(self, target_pose, target_mode):
         x_target, y_target, q_target = target_pose
-        
-        # 第一步：調整朝向
-        self.adjust_yaw(q_target)
-        
-        # 第二步：直線移動
+          
         cmd = Twist()
         tolerance = 0.05  # 距離容忍度
-        
         distance = math.sqrt((x_target - self.last_x_target)**2 + 
                             (y_target - self.last_y_target)**2)
-        if distance > tolerance:
-              
-        # target_angle = math.atan2(y_target - self.current_pose[1], 
-        #                         x_target - self.current_pose[0])
-        # angular_error = target_angle - self.current_pose[2]
         
-        # cmd.linear.x = -self.kp_linear * distance
-        # cmd.angular.z = self.kp_angular * angular_error
+        if target_mode == "Straight" and distance > tolerance:
+            # 直線移動邏輯  # PID 控制
             count = 7
             while count > 0:
-                count = count - 1
+                count -= 1
                 cmd.linear.x = -self.kp_linear * 0.3
                 cmd.angular.z = 0.0
                 self.pub.publish(cmd)
                 self.rate.sleep()
+        
+        elif target_mode == "Rotated":
+            # 旋轉移動邏輯
+            self.adjust_yaw(q_target)
+        
+        elif target_mode == "Stop":
+            # 停止邏輯
+            cmd.linear.x = 0.0
+            cmd.angular.z = 0.0
+            self.pub.publish(cmd)
+            self.rate.sleep()
+
         self.last_x_target = x_target
         self.last_y_target = y_target
     
     def return_to_start(self):
         self.is_recording = False
         reversed_poses = self.poses[::-1]
-        rospy.loginfo("Starting return to origin...")
+        rospy.loginfo(f"Starting return to origin...\nRecord points: {len(reversed_poses)}")
         
         for i in range(len(reversed_poses) - 1):
-            target_pose = reversed_poses[i + 1]
-            self.move_to_point(target_pose)
-            rospy.loginfo(f"Moved to: {target_pose}")
+            target_pose, target_mode = reversed_poses[i + 1]
+            self.move_to_point(target_pose, target_mode)
+            rospy.loginfo(f"Moved to: {target_pose} with mode: {target_mode}")
         
         cmd = Twist()
         cmd.linear.x = 0.0
@@ -162,7 +176,7 @@ class PoseRecorderAndReturn:
         rospy.loginfo("Returned to start!")
     
     def handle_service_request(self, req):
-        rospy.loginfo("Service called!")
+        rospy.logwarn("User's control disconnected!")
         self.return_to_start()
         return TriggerResponse(success=True, message="Service executed successfully.")
     
