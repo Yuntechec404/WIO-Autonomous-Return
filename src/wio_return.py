@@ -119,7 +119,7 @@ class PoseRecorderAndReturn:
         # 規範化 yaw 角度差到 [-π, π]
         yaw_diff = (yaw_diff + np.pi) % (2 * np.pi) - np.pi
     
-    return q_target, yaw_diff
+        return q_target, yaw_diff
 
     def adjust_yaw(self, target_q):
         cmd = Twist()
